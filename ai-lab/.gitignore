@@ -1,0 +1,16 @@
+# Secrets — never commit
+.env
+
+# Docker bind-mount data (large, machine-local)
+data/
+models/
+output/
+
+# User workspace files
+workspace/private/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.venv/

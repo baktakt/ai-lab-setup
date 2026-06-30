@@ -1,0 +1,95 @@
+services:
+
+  # ── Local LLM server ────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Chat UI ──────────────────────────────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ai-open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_NAME=Hermes AI Lab
+    volumes:
+      - ./data/open-webui:/app/backend/data
+    depends_on:
+      - ollama
+
+  # ── Vector database ──────────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ai-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+
+  # ── Image generation ─────────────────────────────────────────────────────────
+  comfyui:
+    image: ghcr.io/ai-dock/comfyui:latest
+    container_name: ai-comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"
+    volumes:
+      - ./data/comfyui:/workspace
+      - ./models/comfyui:/workspace/ComfyUI/models
+      - ./output/comfyui:/workspace/ComfyUI/output
+    environment:
+      - WEB_ENABLE_AUTH=false
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Hermes Agent ─────────────────────────────────────────────────────────────
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: ai-hermes-agent
+    restart: unless-stopped
+    command: gateway run
+    ports:
+      - "8642:8642"  # gateway / OpenAI-compatible API
+      - "9119:9119"  # web dashboard
+    shm_size: 1g     # required for browser/Playwright tools
+    environment:
+      - HERMES_DASHBOARD=1
+      # API keys (can also live in ~/.hermes/.env on the host instead)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ~/.hermes:/opt/data
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
+    depends_on:
+      - ollama
+      - qdrant
+
+networks:
+  default:
+    name: ai-lab-network
