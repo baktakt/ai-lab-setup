@@ -46,6 +46,7 @@ The setup should be powerful enough for serious hobby/prototype work, but simple
 | Vector database | Qdrant | Embeddings, semantic memory and RAG |
 | Image generation UI | ComfyUI | Node-based image generation workflows |
 | Agent layer | Hermes Agent | Personal workflow/orchestration layer |
+| Home automation (optional) | Home Assistant | Home automation hub with Zigbee support via ConBee |
 | Remote access | SSH + Tailscale | Safe remote access from other devices |
 | Gaming | Steam + Proton | Linux gaming layer |
 
@@ -76,6 +77,7 @@ For the discussed Reuseit-style system, the first recommended upgrade is **64GB 
 | Hermes Agent UI | `http://localhost:8080` | Run agents and custom workflows |
 | Qdrant dashboard/API | `http://localhost:6333` | Vector database/API |
 | Ollama API | `http://localhost:11434` | LLM API endpoint |
+| Home Assistant (optional) | `http://localhost:8123` | Home automation dashboard |
 
 ---
 

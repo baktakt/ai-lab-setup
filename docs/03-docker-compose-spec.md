@@ -91,6 +91,24 @@ services:
     depends_on:
       - ollama
       - qdrant
+
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ai-home-assistant
+    restart: unless-stopped
+    profiles:
+      - home-assistant
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./data/home-assistant:/config
+      - /run/dbus:/run/dbus:ro
+    devices:
+      - ${CONBEE_DEVICE:-/dev/ttyACM0}:${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}
+    group_add:
+      - dialout
       - comfyui
 ```
 
@@ -99,6 +117,10 @@ services:
 ```bash
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
+ENABLE_HOME_ASSISTANT=false
+CONBEE_DEVICE=/dev/ttyACM0
+CONBEE_CONTAINER_DEVICE=/dev/ttyACM0
+TZ=UTC
 ```
 
 Optional future values:
@@ -153,6 +175,9 @@ anthropic
 ```bash
 cd ~/ai-lab
 docker compose up -d
+
+# Optional Home Assistant profile:
+docker compose --profile home-assistant up -d
 ```
 
 ## 6. Shutdown
@@ -176,6 +201,7 @@ docker compose logs -f open-webui
 docker compose logs -f comfyui
 docker compose logs -f hermes-agent
 docker compose logs -f qdrant
+docker compose logs -f home-assistant
 ```
 
 ## 8. Pull starter models

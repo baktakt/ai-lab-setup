@@ -22,6 +22,10 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AI_LAB_SRC="$REPO_DIR/ai-lab"
 DEFAULT_INSTALL_DIR="$HOME/ai-lab"
 INSTALL_DIR="${INSTALL_DIR:-}"  # can be pre-set via env var
+INSTALL_HOME_ASSISTANT="${INSTALL_HOME_ASSISTANT:-}"  # true/false
+CONBEE_DEVICE="${CONBEE_DEVICE:-/dev/ttyACM0}"
+CONBEE_CONTAINER_DEVICE="${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}"
+TZ_VALUE="${TZ_VALUE:-UTC}"
 
 log()     { echo -e "${GREEN}[setup]${NC} $1"; }
 warn()    { echo -e "${YELLOW}[warn]${NC}  $1"; }
@@ -77,6 +81,34 @@ if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/docker-compose.yml" ]]; then
 else
   UPGRADE_MODE=false
   log "Installing to: $INSTALL_DIR"
+fi
+
+# =============================================================================
+# Optional components
+# =============================================================================
+section "Optional components"
+
+if [[ -z "$INSTALL_HOME_ASSISTANT" ]]; then
+  read -r -p "  Enable optional Home Assistant + ConBee setup? [y/N] " choice
+  if [[ "$choice" =~ ^[Yy]$ ]]; then
+    INSTALL_HOME_ASSISTANT=true
+  else
+    INSTALL_HOME_ASSISTANT=false
+  fi
+fi
+
+if [[ "$INSTALL_HOME_ASSISTANT" =~ ^([Tt][Rr][Uu][Ee]|1|[Yy][Ee][Ss]|[Yy])$ ]]; then
+  INSTALL_HOME_ASSISTANT=true
+  read -r -p "  ConBee host device path [$CONBEE_DEVICE]: " conbee_input
+  CONBEE_DEVICE="${conbee_input:-$CONBEE_DEVICE}"
+  read -r -p "  Container device path [$CONBEE_CONTAINER_DEVICE]: " conbee_container_input
+  CONBEE_CONTAINER_DEVICE="${conbee_container_input:-$CONBEE_CONTAINER_DEVICE}"
+  read -r -p "  Timezone for Home Assistant [$TZ_VALUE]: " tz_input
+  TZ_VALUE="${tz_input:-$TZ_VALUE}"
+  log "Home Assistant profile will be enabled."
+else
+  INSTALL_HOME_ASSISTANT=false
+  log "Home Assistant profile will be disabled (can be enabled later in .env)."
 fi
 
 # =============================================================================
@@ -339,6 +371,10 @@ DATA_DIRS=(
   "$INSTALL_DIR/workspace/inbox"
 )
 
+if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
+  DATA_DIRS+=("$INSTALL_DIR/data/home-assistant")
+fi
+
 step "Creating data/workspace directories..."
 for dir in "${DATA_DIRS[@]}"; do
   mkdir -p "$dir"
@@ -349,9 +385,14 @@ log "Directories ready."
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   step "Creating .env from template..."
   cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+  sed -i "s|^ENABLE_HOME_ASSISTANT=.*|ENABLE_HOME_ASSISTANT=$INSTALL_HOME_ASSISTANT|" "$INSTALL_DIR/.env"
+  sed -i "s|^CONBEE_DEVICE=.*|CONBEE_DEVICE=$CONBEE_DEVICE|" "$INSTALL_DIR/.env"
+  sed -i "s|^CONBEE_CONTAINER_DEVICE=.*|CONBEE_CONTAINER_DEVICE=$CONBEE_CONTAINER_DEVICE|" "$INSTALL_DIR/.env"
+  sed -i "s|^TZ=.*|TZ=$TZ_VALUE|" "$INSTALL_DIR/.env"
   warn ".env created — edit $INSTALL_DIR/.env to add your API keys before starting services."
 else
   log ".env already exists — not overwriting."
+  warn "If needed, set ENABLE_HOME_ASSISTANT/CONBEE_DEVICE/TZ in $INSTALL_DIR/.env."
 fi
 
 # Upgrade: pull latest images and restart running stack
@@ -410,6 +451,9 @@ echo -e "     ComfyUI       → http://localhost:8188"
 echo -e "     Hermes API    → http://localhost:8642"
 echo -e "     Hermes UI     → http://localhost:9119"
 echo -e "     Qdrant        → http://localhost:6333"
+if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
+  echo -e "     Home Assistant → http://localhost:8123"
+fi
 echo ""
 echo -e "  7. ${BOLD}Before gaming${NC}:"
 echo -e "     $INSTALL_DIR/scripts/gaming-mode.sh"
