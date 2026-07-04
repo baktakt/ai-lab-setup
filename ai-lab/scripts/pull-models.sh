@@ -12,9 +12,37 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
 fi
 
 pull() {
+  local model="$1"
+  local output wanted_digest wanted_blob
+
   echo ""
-  echo "Pulling: $1"
-  docker exec "$CONTAINER" ollama pull "$1"
+  echo "Pulling: $model"
+
+  set +e
+  output="$(docker exec "$CONTAINER" ollama pull "$model" 2>&1)"
+  local status=$?
+  set -e
+
+  if [[ $status -eq 0 ]]; then
+    printf '%s\n' "$output"
+    return 0
+  fi
+
+  if [[ "$output" =~ digest\ mismatch.*want\ (sha256:[0-9a-f]+) ]]; then
+    wanted_digest="${BASH_REMATCH[1]}"
+    wanted_blob="/root/.ollama/models/blobs/${wanted_digest/:/-}"
+
+    printf '%s\n' "$output"
+    echo "Detected corrupted Ollama blob: $wanted_digest"
+    echo "Removing $wanted_blob and retrying once..."
+
+    docker exec "$CONTAINER" rm -f "$wanted_blob"
+    docker exec "$CONTAINER" ollama pull "$model"
+    return
+  fi
+
+  printf '%s\n' "$output" >&2
+  return "$status"
 }
 
 # General reasoning (fast)
