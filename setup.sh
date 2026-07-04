@@ -35,6 +35,48 @@ section() { echo -e "\n${BLUE}${BOLD}══════════════�
             echo -e "${BLUE}${BOLD}══════════════════════════════════════${NC}"; }
 step()    { echo -e "  ${BOLD}→${NC} $1"; }
 
+generate_secret() {
+  if command -v openssl &>/dev/null; then
+    openssl rand -base64 24 | tr '+/' '-_' | tr -d '='
+  else
+    date +%s%N
+  fi
+}
+
+env_value() {
+  local file="$1"
+  local key="$2"
+  grep -E "^${key}=" "$file" 2>/dev/null | tail -n1 | cut -d= -f2-
+}
+
+set_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if grep -qE "^${key}=" "$file"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+
+ensure_env_defaults() {
+  local file="$1"
+  local hermes_password
+
+  if ! grep -qE '^HERMES_DASHBOARD_BASIC_AUTH_USERNAME=' "$file"; then
+    set_env_value "$file" "HERMES_DASHBOARD_BASIC_AUTH_USERNAME" "admin"
+    log "Added missing HERMES_DASHBOARD_BASIC_AUTH_USERNAME to .env."
+  fi
+
+  hermes_password="$(env_value "$file" "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD")"
+  if [[ -z "$hermes_password" || "$hermes_password" == "change-this" ]]; then
+    set_env_value "$file" "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD" "$(generate_secret)"
+    log "Set HERMES_DASHBOARD_BASIC_AUTH_PASSWORD in .env."
+  fi
+}
+
 # =============================================================================
 # Pre-flight checks
 # =============================================================================
@@ -389,9 +431,11 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   sed -i "s|^CONBEE_DEVICE=.*|CONBEE_DEVICE=$CONBEE_DEVICE|" "$INSTALL_DIR/.env"
   sed -i "s|^CONBEE_CONTAINER_DEVICE=.*|CONBEE_CONTAINER_DEVICE=$CONBEE_CONTAINER_DEVICE|" "$INSTALL_DIR/.env"
   sed -i "s|^TZ=.*|TZ=$TZ_VALUE|" "$INSTALL_DIR/.env"
+  ensure_env_defaults "$INSTALL_DIR/.env"
   warn ".env created — edit $INSTALL_DIR/.env to add your API keys before starting services."
 else
   log ".env already exists — not overwriting."
+  ensure_env_defaults "$INSTALL_DIR/.env"
   warn "If needed, set ENABLE_HOME_ASSISTANT/CONBEE_DEVICE/TZ in $INSTALL_DIR/.env."
 fi
 
