@@ -90,6 +90,25 @@ services:
       - ollama
       - qdrant
 
+  # ── Home Assistant (optional profile) ────────────────────────────────────────
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ai-home-assistant
+    restart: unless-stopped
+    profiles:
+      - home-assistant
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./data/home-assistant:/config
+      - /run/dbus:/run/dbus:ro
+    devices:
+      - ${CONBEE_DEVICE:-/dev/ttyACM0}:${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}
+    group_add:
+      - dialout
+
 networks:
   default:
     name: ai-lab-network
