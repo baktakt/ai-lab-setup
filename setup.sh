@@ -21,7 +21,9 @@ NC='\033[0m'
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AI_LAB_SRC="$REPO_DIR/ai-lab"
 DEFAULT_INSTALL_DIR="$HOME/ai-lab"
+DEFAULT_HERMES_WORKSPACE_DIR="$HOME/workspace"
 INSTALL_DIR="${INSTALL_DIR:-}"  # can be pre-set via env var
+HERMES_WORKSPACE_DIR="${HERMES_WORKSPACE_DIR:-}"  # can be pre-set via env var
 INSTALL_HOME_ASSISTANT="${INSTALL_HOME_ASSISTANT:-}"  # true/false
 CONBEE_DEVICE="${CONBEE_DEVICE:-/dev/ttyACM0}"
 CONBEE_CONTAINER_DEVICE="${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}"
@@ -75,6 +77,11 @@ ensure_env_defaults() {
     set_env_value "$file" "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD" "$(generate_secret)"
     log "Set HERMES_DASHBOARD_BASIC_AUTH_PASSWORD in .env."
   fi
+
+  if ! grep -qE '^HERMES_WORKSPACE_DIR=' "$file"; then
+    set_env_value "$file" "HERMES_WORKSPACE_DIR" "$HERMES_WORKSPACE_DIR"
+    log "Added missing HERMES_WORKSPACE_DIR to .env."
+  fi
 }
 
 # =============================================================================
@@ -124,6 +131,22 @@ else
   UPGRADE_MODE=false
   log "Installing to: $INSTALL_DIR"
 fi
+
+# =============================================================================
+# Hermes workspace
+# =============================================================================
+section "Hermes workspace"
+
+echo ""
+echo -e "  Hermes will see this host folder as /workspace inside the container."
+echo -e "  Use this for project files Hermes should read, write and process."
+echo ""
+if [[ -z "$HERMES_WORKSPACE_DIR" ]]; then
+  read -r -p "  Hermes workspace path [~/workspace]: " workspace_input
+  HERMES_WORKSPACE_DIR="${workspace_input:-$DEFAULT_HERMES_WORKSPACE_DIR}"
+fi
+HERMES_WORKSPACE_DIR="${HERMES_WORKSPACE_DIR/#\~/$HOME}"  # expand leading tilde
+log "Hermes workspace: $HERMES_WORKSPACE_DIR"
 
 # =============================================================================
 # Optional components
@@ -397,7 +420,7 @@ rsync -a \
 chmod +x "$INSTALL_DIR/scripts/"*.sh
 log "Files copied to $INSTALL_DIR."
 
-# Create data/workspace directories (bind-mounted by docker compose)
+# Create data directories and Hermes workspace folders (bind-mounted by docker compose)
 DATA_DIRS=(
   "$INSTALL_DIR/data/ollama"
   "$INSTALL_DIR/data/open-webui"
@@ -405,12 +428,12 @@ DATA_DIRS=(
   "$INSTALL_DIR/data/comfyui"
   "$INSTALL_DIR/models/comfyui"
   "$INSTALL_DIR/output/comfyui"
-  "$INSTALL_DIR/workspace/documents"
-  "$INSTALL_DIR/workspace/experiments"
-  "$INSTALL_DIR/workspace/datasets"
-  "$INSTALL_DIR/workspace/reports"
-  "$INSTALL_DIR/workspace/exports"
-  "$INSTALL_DIR/workspace/inbox"
+  "$HERMES_WORKSPACE_DIR/documents"
+  "$HERMES_WORKSPACE_DIR/experiments"
+  "$HERMES_WORKSPACE_DIR/datasets"
+  "$HERMES_WORKSPACE_DIR/reports"
+  "$HERMES_WORKSPACE_DIR/exports"
+  "$HERMES_WORKSPACE_DIR/inbox"
 )
 
 if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
@@ -431,11 +454,13 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   sed -i "s|^CONBEE_DEVICE=.*|CONBEE_DEVICE=$CONBEE_DEVICE|" "$INSTALL_DIR/.env"
   sed -i "s|^CONBEE_CONTAINER_DEVICE=.*|CONBEE_CONTAINER_DEVICE=$CONBEE_CONTAINER_DEVICE|" "$INSTALL_DIR/.env"
   sed -i "s|^TZ=.*|TZ=$TZ_VALUE|" "$INSTALL_DIR/.env"
+  sed -i "s|^HERMES_WORKSPACE_DIR=.*|HERMES_WORKSPACE_DIR=$HERMES_WORKSPACE_DIR|" "$INSTALL_DIR/.env"
   ensure_env_defaults "$INSTALL_DIR/.env"
   warn ".env created — edit $INSTALL_DIR/.env to add your API keys before starting services."
 else
   log ".env already exists — not overwriting."
   ensure_env_defaults "$INSTALL_DIR/.env"
+  set_env_value "$INSTALL_DIR/.env" "HERMES_WORKSPACE_DIR" "$HERMES_WORKSPACE_DIR"
   warn "If needed, set ENABLE_HOME_ASSISTANT/CONBEE_DEVICE/TZ in $INSTALL_DIR/.env."
 fi
 
@@ -489,7 +514,11 @@ echo ""
 echo -e "  5. ${BOLD}Pull starter models${NC} (after stack is up):"
 echo -e "     $INSTALL_DIR/scripts/pull-models.sh"
 echo ""
-echo -e "  6. ${BOLD}Open the UIs${NC}:"
+echo -e "  6. ${BOLD}Use the Hermes workspace${NC}:"
+echo -e "     Host path: $HERMES_WORKSPACE_DIR"
+echo -e "     Container path: /workspace"
+echo ""
+echo -e "  7. ${BOLD}Open the UIs${NC}:"
 echo -e "     Open WebUI    → http://localhost:3000"
 echo -e "     ComfyUI       → http://localhost:8188"
 echo -e "     Hermes API    → http://localhost:8642"
@@ -499,7 +528,7 @@ if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
   echo -e "     Home Assistant → http://localhost:8123"
 fi
 echo ""
-echo -e "  7. ${BOLD}Before gaming${NC}:"
+echo -e "  8. ${BOLD}Before gaming${NC}:"
 echo -e "     $INSTALL_DIR/scripts/gaming-mode.sh"
 echo ""
 

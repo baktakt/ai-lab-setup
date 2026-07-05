@@ -85,6 +85,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - ~/.hermes:/opt/data
+      - ${HERMES_WORKSPACE_DIR:-./workspace}:/workspace
     deploy:
       resources:
         limits:
