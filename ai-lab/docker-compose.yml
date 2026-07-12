@@ -81,6 +81,17 @@ services:
       - ollama
       - qdrant
 
+  # ── Docker management UI ────────────────────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: ai-portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/portainer:/data
   # ── Home Assistant (optional profile) ───────────────────────────────────────
   home-assistant:
     image: ghcr.io/home-assistant/home-assistant:stable
