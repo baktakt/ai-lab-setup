@@ -1,23 +1,18 @@
 services:
-
   # ── Local LLM server ────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     container_name: ai-ollama
     restart: unless-stopped
+    environment:
+      - OLLAMA_CONTEXT_LENGTH=32000
     ports:
       - "11434:11434"
     volumes:
       - ./data/ollama:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    gpus: all
 
-  # ── Chat UI ──────────────────────────────────────────────────────────────────
+  # ── Chat UI ─────────────────────────────────────────────────────────────────
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: ai-open-webui
@@ -32,7 +27,7 @@ services:
     depends_on:
       - ollama
 
-  # ── Vector database ──────────────────────────────────────────────────────────
+  # ── Vector database ─────────────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:latest
     container_name: ai-qdrant
@@ -43,7 +38,7 @@ services:
     volumes:
       - ./data/qdrant:/qdrant/storage
 
-  # ── Image generation ─────────────────────────────────────────────────────────
+  # ── Image generation ────────────────────────────────────────────────────────
   comfyui:
     build:
       context: ./comfyui
@@ -57,46 +52,36 @@ services:
       - ./data/comfyui/user:/opt/ComfyUI/user
       - ./models/comfyui:/opt/ComfyUI/models
       - ./output/comfyui:/opt/ComfyUI/output
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    gpus: all
 
-  # ── Hermes Agent ─────────────────────────────────────────────────────────────
+  # ── Hermes Agent ────────────────────────────────────────────────────────────
   hermes-agent:
     image: nousresearch/hermes-agent:latest
     container_name: ai-hermes-agent
     restart: unless-stopped
     command: gateway run
     ports:
-      - "8642:8642"  # gateway / OpenAI-compatible API
-      - "9119:9119"  # web dashboard
-    shm_size: 1g     # required for browser/Playwright tools
+      - "8642:8642"
+      - "9119:9119"
+    shm_size: 1g
     environment:
       - HERMES_DASHBOARD=1
       - HERMES_DASHBOARD_HOST=0.0.0.0
       - HERMES_DASHBOARD_PORT=9119
       - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-admin}
       - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:?Set HERMES_DASHBOARD_BASIC_AUTH_PASSWORD in .env}
-      # API keys (can also live in ~/.hermes/.env on the host instead)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - ~/.hermes:/opt/data
       - ${HERMES_WORKSPACE_DIR:-./workspace}:/workspace
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2'
+    mem_limit: 8g
+    cpus: 4
     depends_on:
       - ollama
       - qdrant
 
-  # ── Home Assistant (optional profile) ────────────────────────────────────────
+  # ── Home Assistant (optional profile) ───────────────────────────────────────
   home-assistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: ai-home-assistant
