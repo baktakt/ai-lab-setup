@@ -47,17 +47,18 @@ services:
       - ./data/qdrant:/qdrant/storage
 
   comfyui:
-    image: ghcr.io/ai-dock/comfyui:latest
+    build:
+      context: ./comfyui
     container_name: ai-comfyui
     restart: unless-stopped
     ports:
       - "8188:8188"
     volumes:
-      - ./data/comfyui:/workspace
-      - ./models/comfyui:/workspace/ComfyUI/models
-      - ./output/comfyui:/workspace/ComfyUI/output
-    environment:
-      - WEB_ENABLE_AUTH=false
+      - ./data/comfyui/custom_nodes:/opt/ComfyUI/custom_nodes
+      - ./data/comfyui/input:/opt/ComfyUI/input
+      - ./data/comfyui/user:/opt/ComfyUI/user
+      - ./models/comfyui:/opt/ComfyUI/models
+      - ./output/comfyui:/opt/ComfyUI/output
     deploy:
       resources:
         reservations:
