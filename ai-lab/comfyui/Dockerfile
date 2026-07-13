@@ -7,11 +7,16 @@ ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    CC=/usr/bin/gcc \
+    CXX=/usr/bin/g++
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
+        build-essential \
+        gcc \
+        g++ \
         libgl1 \
         libglib2.0-0 \
         libgomp1 \
