@@ -11,7 +11,7 @@ services:
     container_name: ai-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "${AI_BIND_ADDRESS:-127.0.0.1}:11434:11434"
     volumes:
       - ./data/ollama:/root/.ollama
     deploy:
@@ -27,7 +27,7 @@ services:
     container_name: ai-open-webui
     restart: unless-stopped
     ports:
-      - "3000:8080"
+      - "${AI_BIND_ADDRESS:-127.0.0.1}:3000:8080"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - WEBUI_NAME=Hermes AI Lab
@@ -41,45 +41,22 @@ services:
     container_name: ai-qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "${AI_BIND_ADDRESS:-127.0.0.1}:6333:6333"
     volumes:
       - ./data/qdrant:/qdrant/storage
 
-  comfyui:
-    build:
-      context: ./comfyui
-    container_name: ai-comfyui
-    restart: unless-stopped
-    ports:
-      - "8188:8188"
-    volumes:
-      - ./data/comfyui/custom_nodes:/opt/ComfyUI/custom_nodes
-      - ./data/comfyui/input:/opt/ComfyUI/input
-      - ./data/comfyui/user:/opt/ComfyUI/user
-      - ./models/comfyui:/opt/ComfyUI/models
-      - ./output/comfyui:/opt/ComfyUI/output
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
   hermes-agent:
-    build:
-      context: ./hermes
-      dockerfile: Dockerfile
+    image: nousresearch/hermes-agent:latest
     container_name: ai-hermes-agent
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${AI_BIND_ADDRESS:-127.0.0.1}:8642:8642"
+      - "${AI_BIND_ADDRESS:-127.0.0.1}:9119:9119"
     environment:
       - HERMES_ENV=local
       - OLLAMA_BASE_URL=http://ollama:11434
       - QDRANT_URL=http://qdrant:6333
-      - COMFYUI_URL=http://comfyui:8188
+      - COMFYUI_URL=http://host.docker.internal:8188
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DEFAULT_CHAT_MODEL=qwen2.5-coder:14b
@@ -92,6 +69,8 @@ services:
     depends_on:
       - ollama
       - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   home-assistant:
     image: ghcr.io/home-assistant/home-assistant:stable
@@ -110,14 +89,19 @@ services:
       - ${CONBEE_DEVICE:-/dev/ttyACM0}:${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}
     group_add:
       - dialout
-      - comfyui
 ```
+
+ComfyUI is intentionally absent from Compose. `setup.sh` clones the official
+repository to `~/.local/share/comfyui/ComfyUI`, creates a dedicated virtual
+environment, and installs a hardened `comfyui.service` user unit. Persistent
+models, inputs, user data, custom nodes, and outputs remain under `~/ai-lab`.
 
 ## 2. `.env`
 
 ```bash
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
+AI_BIND_ADDRESS=127.0.0.1
 ENABLE_HOME_ASSISTANT=false
 CONBEE_DEVICE=/dev/ttyACM0
 CONBEE_CONTAINER_DEVICE=/dev/ttyACM0
@@ -175,7 +159,7 @@ anthropic
 
 ```bash
 cd ~/ai-lab
-docker compose up -d
+scripts/ai-start.sh
 
 # Optional Home Assistant profile:
 docker compose --profile home-assistant up -d
@@ -185,7 +169,7 @@ docker compose --profile home-assistant up -d
 
 ```bash
 cd ~/ai-lab
-docker compose down
+scripts/ai-stop.sh
 ```
 
 ## 7. View logs
@@ -199,10 +183,10 @@ Service-specific logs:
 ```bash
 docker compose logs -f ollama
 docker compose logs -f open-webui
-docker compose logs -f comfyui
 docker compose logs -f hermes-agent
 docker compose logs -f qdrant
 docker compose logs -f home-assistant
+journalctl --user -u comfyui -f
 ```
 
 ## 8. Pull starter models

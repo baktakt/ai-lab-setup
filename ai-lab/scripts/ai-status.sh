@@ -5,5 +5,8 @@ cd "$(dirname "$0")/.."
 echo "=== Docker services ==="
 docker compose ps
 echo ""
+echo "=== Host ComfyUI service ==="
+systemctl --user --no-pager --full status comfyui.service || true
+echo ""
 echo "=== GPU ==="
 nvidia-smi

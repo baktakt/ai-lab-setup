@@ -6,7 +6,7 @@ app = FastAPI(title="Hermes Agent", version="0.1.0")
 
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
-COMFYUI_URL = os.getenv("COMFYUI_URL", "http://comfyui:8188")
+COMFYUI_URL = os.getenv("COMFYUI_URL", "http://host.docker.internal:8188")
 
 
 async def _check(url: str) -> str:

@@ -6,7 +6,7 @@ From the host:
 
 ```bash
 cd ~/ai-lab
-docker compose up -d
+scripts/ai-start.sh
 ```
 
 Open:
@@ -14,74 +14,20 @@ Open:
 ```text
 Open WebUI: http://localhost:3000
 ComfyUI:    http://localhost:8188
-Hermes:     http://localhost:8080
+Hermes:     http://localhost:9119
 ```
 
 ## 2. Daily shutdown
 
 ```bash
 cd ~/ai-lab
-docker compose down
+scripts/ai-stop.sh
 ```
 
-## 3. Suggested scripts
+## 3. Operational scripts
 
-Create folder:
-
-```bash
-mkdir -p ~/ai-lab/scripts
-```
-
-### `scripts/ai-start.sh`
-
-```bash
-#!/usr/bin/env bash
-set -e
-cd ~/ai-lab
-docker compose up -d
-```
-
-### `scripts/ai-stop.sh`
-
-```bash
-#!/usr/bin/env bash
-set -e
-cd ~/ai-lab
-docker compose down
-```
-
-### `scripts/ai-status.sh`
-
-```bash
-#!/usr/bin/env bash
-cd ~/ai-lab
-docker compose ps
-nvidia-smi
-```
-
-### `scripts/gaming-mode.sh`
-
-```bash
-#!/usr/bin/env bash
-set -e
-cd ~/ai-lab
-docker compose stop comfyui ollama hermes-agent open-webui
-nvidia-smi
-```
-
-### `scripts/pull-models.sh`
-
-```bash
-#!/usr/bin/env bash
-set -e
-
-docker exec -it ai-ollama ollama pull llama3.1:8b
-docker exec -it ai-ollama ollama pull qwen2.5-coder:14b
-docker exec -it ai-ollama ollama pull mistral-nemo
-docker exec -it ai-ollama ollama pull nomic-embed-text
-```
-
-Make scripts executable:
+The setup script installs executable lifecycle, status, model-pull, gaming-mode,
+and update scripts in `~/ai-lab/scripts`.
 
 ```bash
 chmod +x ~/ai-lab/scripts/*.sh
@@ -121,18 +67,26 @@ Specific service:
 ```bash
 docker compose logs -f ollama
 docker compose logs -f open-webui
-docker compose logs -f comfyui
 docker compose logs -f hermes-agent
 docker compose logs -f qdrant
 ```
 
-## 6. Updating containers
+ComfyUI logs and status:
+
+```bash
+systemctl --user status comfyui
+journalctl --user -u comfyui -f
+```
+
+## 6. Updating the stack
 
 ```bash
 cd ~/ai-lab
-docker compose pull
-docker compose up -d
+scripts/update.sh
 ```
+
+This pulls and recreates the Docker services, fast-forwards the native ComfyUI
+checkout, refreshes its virtual-environment dependencies, and restarts ComfyUI.
 
 If using local Hermes build:
 

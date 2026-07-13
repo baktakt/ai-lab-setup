@@ -60,8 +60,7 @@ But simplest is to stop all heavy AI services.
 Command:
 
 ```bash
-cd ~/ai-lab
-docker compose stop comfyui ollama hermes-agent open-webui
+~/ai-lab/scripts/gaming-mode.sh
 ```
 
 ### Mixed mode
@@ -104,7 +103,8 @@ set -e
 cd ~/ai-lab
 
 echo "Stopping heavy AI services..."
-docker compose stop comfyui ollama hermes-agent open-webui
+systemctl --user stop comfyui
+docker compose stop ollama hermes-agent open-webui
 
 echo "Current GPU status:"
 nvidia-smi
@@ -112,7 +112,7 @@ nvidia-smi
 echo "Gaming mode ready."
 ```
 
-### `ai-mode.sh`
+### `ai-start.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -121,6 +121,7 @@ cd ~/ai-lab
 
 echo "Starting AI services..."
 docker compose up -d
+systemctl --user start comfyui
 
 echo "Current status:"
 docker compose ps
@@ -132,7 +133,7 @@ nvidia-smi
 Before AI session:
 
 ```bash
-~/ai-lab/scripts/ai-mode.sh
+~/ai-lab/scripts/ai-start.sh
 ```
 
 Before gaming:

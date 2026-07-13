@@ -14,6 +14,10 @@ if [[ "${enable_home_assistant,,}" == "true" ]]; then
 else
   docker compose up -d
 fi
+
+if command -v systemctl &>/dev/null; then
+  systemctl --user start comfyui.service
+fi
 echo ""
 echo "Services:"
 docker compose ps
@@ -23,7 +27,7 @@ echo "ComfyUI    → http://localhost:8188"
 echo "Hermes     → http://localhost:9119"
 echo "Qdrant     → http://localhost:6333"
 echo "Ollama API → http://localhost:11434"
-echo "Portainer  → http://localhost:8000"
+echo "Portainer  → https://localhost:9443"
 if [[ "${enable_home_assistant,,}" == "true" ]]; then
   echo "Home Assistant → http://localhost:8123"
 fi

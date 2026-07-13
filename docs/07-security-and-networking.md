@@ -19,12 +19,17 @@ Local URLs:
 ```text
 http://localhost:3000  Open WebUI
 http://localhost:8188  ComfyUI
-http://localhost:8080  Hermes Agent
+http://localhost:9119  Hermes Agent
 http://localhost:6333  Qdrant
 http://localhost:11434  Ollama
 ```
 
-From another device on the same LAN, use the machine IP:
+Docker-published services and native ComfyUI bind only to loopback by default.
+This prevents other LAN devices from connecting. If LAN or Tailscale access is
+needed, bind only to the desired host/Tailscale address and configure a firewall
+and authentication first. For Docker services, set `AI_BIND_ADDRESS` in `.env`.
+
+After intentionally enabling LAN access, use the machine IP:
 
 ```text
 http://<machine-ip>:3000
@@ -69,7 +74,8 @@ OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 ```
 
-Do not commit `.env` to Git.
+Do not commit `.env` to Git. The setup script stores it with mode `0600` so other
+local users cannot read API keys.
 
 Use `.gitignore`:
 
@@ -92,6 +98,14 @@ Minimum recommendations:
 | Hermes | Add login/auth before storing sensitive workflows |
 | Qdrant | Do not expose publicly |
 | Ollama | Do not expose publicly |
+
+Portainer has root-equivalent control of Docker through its socket mount. Keep
+it loopback-only, use a strong account password, and remove the service if it is
+not needed.
+
+The optional Home Assistant profile uses host networking, privileged mode, and
+the host D-Bus socket. Enable it only when the hardware integration requires
+those permissions; compromise of that container would have high host impact.
 
 ## 7. Data privacy
 
@@ -126,7 +140,7 @@ Use a conservative update rhythm:
 OS security updates: regular
 Docker images: manual when needed
 GPU drivers: update only when stable/needed
-ComfyUI/custom nodes: update carefully
+ComfyUI/custom nodes: review changes before updating production workflows
 Hermes: version-controlled
 ```
 

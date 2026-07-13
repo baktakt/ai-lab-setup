@@ -22,8 +22,11 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AI_LAB_SRC="$REPO_DIR/ai-lab"
 DEFAULT_INSTALL_DIR="$HOME/ai-lab"
 DEFAULT_HERMES_WORKSPACE_DIR="$HOME/workspace"
+DEFAULT_COMFYUI_ROOT="$HOME/.local/share/comfyui"
 INSTALL_DIR="${INSTALL_DIR:-}"  # can be pre-set via env var
 HERMES_WORKSPACE_DIR="${HERMES_WORKSPACE_DIR:-}"  # can be pre-set via env var
+COMFYUI_ROOT="${COMFYUI_ROOT:-$DEFAULT_COMFYUI_ROOT}"
+PYTORCH_INDEX_URL="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu130}"
 INSTALL_HOME_ASSISTANT="${INSTALL_HOME_ASSISTANT:-}"  # true/false
 CONBEE_DEVICE="${CONBEE_DEVICE:-/dev/ttyACM0}"
 CONBEE_CONTAINER_DEVICE="${CONBEE_CONTAINER_DEVICE:-/dev/ttyACM0}"
@@ -82,6 +85,13 @@ ensure_env_defaults() {
     set_env_value "$file" "HERMES_WORKSPACE_DIR" "$HERMES_WORKSPACE_DIR"
     log "Added missing HERMES_WORKSPACE_DIR to .env."
   fi
+
+  if ! grep -qE '^AI_BIND_ADDRESS=' "$file"; then
+    set_env_value "$file" "AI_BIND_ADDRESS" "127.0.0.1"
+    log "Added loopback-only AI_BIND_ADDRESS to .env."
+  fi
+
+  chmod 600 "$file"
 }
 
 # =============================================================================
@@ -208,6 +218,13 @@ BASE_PKGS=(
   openssh-server
   unzip
   jq
+  rsync
+  python3
+  python3-venv
+  python3-pip
+  libgl1
+  libglib2.0-0
+  libgomp1
 )
 
 step "Installing base packages..."
@@ -477,12 +494,82 @@ else
   warn "If needed, set ENABLE_HOME_ASSISTANT/CONBEE_DEVICE/TZ in $INSTALL_DIR/.env."
 fi
 
+# =============================================================================
+# ComfyUI (native host install)
+# =============================================================================
+section "ComfyUI host install"
+
+COMFYUI_REPO_DIR="$COMFYUI_ROOT/ComfyUI"
+COMFYUI_VENV="$COMFYUI_ROOT/.venv"
+
+# Release port 8188 during migration from the previous Docker-based install.
+# The later Compose run removes this stopped container as an orphan.
+if docker container inspect ai-comfyui &>/dev/null; then
+  step "Stopping the old ComfyUI container for host migration..."
+  docker stop ai-comfyui >/dev/null
+fi
+
+# The former container ran as root and may have left runtime files that the
+# native user service cannot update.
+sudo chown -R "$(id -u):$(id -g)" \
+  "$INSTALL_DIR/data/comfyui" \
+  "$INSTALL_DIR/output/comfyui"
+
+mkdir -p "$COMFYUI_ROOT"
+if [[ -d "$COMFYUI_REPO_DIR/.git" ]]; then
+  step "Updating the existing ComfyUI checkout..."
+  git -C "$COMFYUI_REPO_DIR" pull --ff-only
+elif [[ -e "$COMFYUI_REPO_DIR" ]]; then
+  error "$COMFYUI_REPO_DIR exists but is not a Git checkout. Move it aside or set COMFYUI_ROOT."
+else
+  step "Cloning the latest ComfyUI source..."
+  git clone https://github.com/Comfy-Org/ComfyUI.git "$COMFYUI_REPO_DIR"
+fi
+
+if [[ ! -x "$COMFYUI_VENV/bin/python" ]]; then
+  step "Creating the ComfyUI Python virtual environment..."
+  python3 -m venv "$COMFYUI_VENV"
+fi
+
+step "Installing the latest supported GPU and ComfyUI dependencies..."
+"$COMFYUI_VENV/bin/python" -m pip install --upgrade pip setuptools wheel
+"$COMFYUI_VENV/bin/python" -m pip install --upgrade \
+  torch torchvision torchaudio \
+  --extra-index-url "$PYTORCH_INDEX_URL"
+"$COMFYUI_VENV/bin/python" -m pip install --upgrade -r "$COMFYUI_REPO_DIR/requirements.txt"
+
+DOCKER_BRIDGE_ADDRESS="$(ip -4 -o addr show docker0 2>/dev/null | awk '{split($4, a, "/"); print a[1]; exit}')"
+COMFYUI_LISTEN_ADDRESS="${COMFYUI_LISTEN_ADDRESS:-127.0.0.1${DOCKER_BRIDGE_ADDRESS:+,$DOCKER_BRIDGE_ADDRESS}}"
+
+step "Installing the ComfyUI user service..."
+mkdir -p "$HOME/.local/bin" "$HOME/.config/ai-lab" "$HOME/.config/systemd/user"
+install -m 0755 "$INSTALL_DIR/scripts/comfyui-run.sh" "$HOME/.local/bin/ai-lab-comfyui-run"
+install -m 0644 "$INSTALL_DIR/systemd/comfyui.service" "$HOME/.config/systemd/user/comfyui.service"
+{
+  printf 'COMFYUI_REPO_DIR=%q\n' "$COMFYUI_REPO_DIR"
+  printf 'COMFYUI_VENV=%q\n' "$COMFYUI_VENV"
+  printf 'COMFYUI_DATA_DIR=%q\n' "$INSTALL_DIR/data/comfyui"
+  printf 'COMFYUI_MODELS_DIR=%q\n' "$INSTALL_DIR/models/comfyui"
+  printf 'COMFYUI_OUTPUT_DIR=%q\n' "$INSTALL_DIR/output/comfyui"
+  printf 'COMFYUI_LISTEN_ADDRESS=%q\n' "$COMFYUI_LISTEN_ADDRESS"
+  printf 'COMFYUI_PORT=%q\n' "8188"
+  printf 'PYTORCH_INDEX_URL=%q\n' "$PYTORCH_INDEX_URL"
+} > "$HOME/.config/ai-lab/comfyui.env"
+chmod 600 "$HOME/.config/ai-lab/comfyui.env"
+
+systemctl --user daemon-reload
+systemctl --user enable --now comfyui.service
+if command -v loginctl &>/dev/null; then
+  sudo loginctl enable-linger "$(whoami)"
+fi
+log "ComfyUI installed from the latest source and running as a host service."
+
 # Upgrade: pull latest images and restart running stack
 if [[ "$UPGRADE_MODE" == true ]]; then
   step "Pulling latest Docker images..."
   (cd "$INSTALL_DIR" && docker compose pull)
   step "Restarting stack with updated images..."
-  (cd "$INSTALL_DIR" && docker compose up -d)
+  (cd "$INSTALL_DIR" && docker compose up -d --remove-orphans)
   log "Stack upgraded and restarted."
 fi
 
@@ -537,13 +624,16 @@ echo -e "     ComfyUI       → http://localhost:8188"
 echo -e "     Hermes API    → http://localhost:8642"
 echo -e "     Hermes UI     → http://localhost:9119"
 echo -e "     Qdrant        → http://localhost:6333"
-echo -e "     Portainer     → http://localhost:8000"
+echo -e "     Portainer     → https://localhost:9443"
 if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
   echo -e "     Home Assistant → http://localhost:8123"
 fi
 echo ""
 echo -e "  8. ${BOLD}Before gaming${NC}:"
 echo -e "     $INSTALL_DIR/scripts/gaming-mode.sh"
+echo ""
+echo -e "  9. ${BOLD}Update the running stack and ComfyUI${NC}:"
+echo -e "     $INSTALL_DIR/scripts/update.sh"
 echo ""
 
 if groups "$(whoami)" | grep -q docker; then

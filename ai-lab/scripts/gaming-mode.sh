@@ -5,8 +5,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "Switching to gaming mode..."
-echo "Stopping: ollama, open-webui, comfyui, hermes-agent"
-docker compose stop comfyui ollama hermes-agent open-webui
+echo "Stopping: ollama, open-webui, ComfyUI, hermes-agent"
+systemctl --user stop comfyui.service
+docker compose stop ollama hermes-agent open-webui
 
 echo ""
 echo "VRAM now available for gaming."

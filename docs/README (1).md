@@ -74,7 +74,7 @@ For the discussed Reuseit-style system, the first recommended upgrade is **64GB 
 |---|---|---|
 | Open WebUI | `http://localhost:3000` | Chat with local models |
 | ComfyUI | `http://localhost:8188` | Image generation workflows |
-| Hermes Agent UI | `http://localhost:8080` | Run agents and custom workflows |
+| Hermes Agent UI | `http://localhost:9119` | Run agents and custom workflows |
 | Qdrant dashboard/API | `http://localhost:6333` | Vector database/API |
 | Ollama API | `http://localhost:11434` | LLM API endpoint |
 | Home Assistant (optional) | `http://localhost:8123` | Home automation dashboard |
@@ -99,7 +99,8 @@ Suggested folder:
 │   ├── ai-stop.sh
 │   ├── ai-status.sh
 │   ├── gaming-mode.sh
-│   └── pull-models.sh
+│   ├── pull-models.sh
+│   └── update.sh
 ├── data/
 │   ├── ollama/
 │   ├── open-webui/
@@ -138,9 +139,8 @@ Suggested folder:
 mkdir -p ~/ai-lab
 cd ~/ai-lab
 
-# Add docker-compose.yml and .env
-# Then start the stack:
-docker compose up -d
+# After running setup.sh, start the stack:
+scripts/ai-start.sh
 
 # Pull starter models:
 docker exec -it ai-ollama ollama pull llama3.1:8b
@@ -153,5 +153,5 @@ Then open:
 ```text
 Open WebUI: http://localhost:3000
 ComfyUI:    http://localhost:8188
-Hermes:     http://localhost:8080
+Hermes:     http://localhost:9119
 ```

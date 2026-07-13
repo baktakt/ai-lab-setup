@@ -91,7 +91,9 @@ Hermes should not replace Open WebUI or ComfyUI. It should orchestrate them.
 
 ## 3. Network topology
 
-All services run on a single Docker network by default.
+Ollama, Open WebUI, Qdrant, Hermes and Portainer run on a Docker network.
+ComfyUI runs directly on the host in a Python virtual environment managed by a
+systemd user service. Hermes reaches it through Docker's private host gateway.
 
 Internal service names:
 
@@ -99,7 +101,7 @@ Internal service names:
 ollama:11434
 open-webui:8080
 qdrant:6333
-comfyui:8188
+host.docker.internal:8188 (ComfyUI, from Hermes)
 hermes-agent:8080
 ```
 
@@ -109,8 +111,8 @@ Host ports:
 localhost:11434 → Ollama
 localhost:3000  → Open WebUI
 localhost:6333  → Qdrant
-localhost:8188  → ComfyUI
-localhost:8080  → Hermes Agent
+localhost:8188  → ComfyUI host service
+localhost:9119  → Hermes Agent dashboard
 ```
 
 ## 4. Data persistence
@@ -132,7 +134,7 @@ Persistent data is mounted into local folders:
 The RTX 3090 is shared between:
 
 - Ollama
-- ComfyUI
+- ComfyUI on the host
 - possibly Hermes, if Hermes runs local ML directly
 - games through the desktop session
 

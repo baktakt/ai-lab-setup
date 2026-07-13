@@ -130,7 +130,7 @@ Hermes should read these environment variables:
 HERMES_ENV=local
 OLLAMA_BASE_URL=http://ollama:11434
 QDRANT_URL=http://qdrant:6333
-COMFYUI_URL=http://comfyui:8188
+COMFYUI_URL=http://host.docker.internal:8188
 DEFAULT_CHAT_MODEL=qwen2.5-coder:14b
 DEFAULT_FAST_MODEL=llama3.1:8b
 DEFAULT_EMBEDDING_MODEL=nomic-embed-text
