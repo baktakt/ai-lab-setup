@@ -11,19 +11,21 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CC=/usr/bin/gcc \
     CXX=/usr/bin/g++
 
-RUN apt-get update \
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get clean \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
+        ca-certificates \
         git \
         build-essential \
-        gcc \
-        g++ \
         libgl1 \
         libglib2.0-0 \
         libgomp1 \
         libsm6 \
         libxext6 \
         libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 RUN git clone --depth 1 --branch "${COMFYUI_REF}" "${COMFYUI_REPO}" /opt/ComfyUI
 
