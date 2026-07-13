@@ -26,6 +26,7 @@ DEFAULT_COMFYUI_ROOT="$HOME/.local/share/comfyui"
 INSTALL_DIR="${INSTALL_DIR:-}"  # can be pre-set via env var
 HERMES_WORKSPACE_DIR="${HERMES_WORKSPACE_DIR:-}"  # can be pre-set via env var
 COMFYUI_ROOT="${COMFYUI_ROOT:-$DEFAULT_COMFYUI_ROOT}"
+PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.org/simple}"
 PYTORCH_INDEX_URL="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu130}"
 INSTALL_HOME_ASSISTANT="${INSTALL_HOME_ASSISTANT:-}"  # true/false
 CONBEE_DEVICE="${CONBEE_DEVICE:-/dev/ttyACM0}"
@@ -532,11 +533,20 @@ if [[ ! -x "$COMFYUI_VENV/bin/python" ]]; then
 fi
 
 step "Installing the latest supported GPU and ComfyUI dependencies..."
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade pip setuptools wheel
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade \
-  torch torchvision torchaudio \
-  --extra-index-url "$PYTORCH_INDEX_URL"
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade -r "$COMFYUI_REPO_DIR/requirements.txt"
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "$PYPI_INDEX_URL" \
+  pip setuptools wheel
+# Use PyTorch's pages only for the three top-level wheels. Its full CUDA index
+# can redirect transitive NVIDIA packages to a mirror with stale file hashes.
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "$PYPI_INDEX_URL" \
+  --find-links "${PYTORCH_INDEX_URL%/}/torch/" \
+  --find-links "${PYTORCH_INDEX_URL%/}/torchvision/" \
+  --find-links "${PYTORCH_INDEX_URL%/}/torchaudio/" \
+  torch torchvision torchaudio
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "$PYPI_INDEX_URL" \
+  -r "$COMFYUI_REPO_DIR/requirements.txt"
 
 DOCKER_BRIDGE_ADDRESS="$(ip -4 -o addr show docker0 2>/dev/null | awk '{split($4, a, "/"); print a[1]; exit}')"
 COMFYUI_LISTEN_ADDRESS="${COMFYUI_LISTEN_ADDRESS:-127.0.0.1${DOCKER_BRIDGE_ADDRESS:+,$DOCKER_BRIDGE_ADDRESS}}"
@@ -553,6 +563,7 @@ install -m 0644 "$INSTALL_DIR/systemd/comfyui.service" "$HOME/.config/systemd/us
   printf 'COMFYUI_OUTPUT_DIR=%q\n' "$INSTALL_DIR/output/comfyui"
   printf 'COMFYUI_LISTEN_ADDRESS=%q\n' "$COMFYUI_LISTEN_ADDRESS"
   printf 'COMFYUI_PORT=%q\n' "8188"
+  printf 'PYPI_INDEX_URL=%q\n' "$PYPI_INDEX_URL"
   printf 'PYTORCH_INDEX_URL=%q\n' "$PYTORCH_INDEX_URL"
 } > "$HOME/.config/ai-lab/comfyui.env"
 chmod 600 "$HOME/.config/ai-lab/comfyui.env"

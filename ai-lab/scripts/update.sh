@@ -12,6 +12,8 @@ fi
 
 # shellcheck source=/dev/null
 source "$CONFIG_FILE"
+PYTORCH_WHEEL_ROOT="${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu130}"
+PYTORCH_WHEEL_ROOT="${PYTORCH_WHEEL_ROOT%/}"
 
 echo "Updating Docker images..."
 docker compose --project-directory "$LAB_DIR" pull
@@ -19,11 +21,19 @@ docker compose --project-directory "$LAB_DIR" up -d --remove-orphans
 
 echo "Updating ComfyUI..."
 git -C "$COMFYUI_REPO_DIR" pull --ff-only
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade pip setuptools wheel
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade \
-  torch torchvision torchaudio \
-  --extra-index-url "${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu130}"
-"$COMFYUI_VENV/bin/python" -m pip install --upgrade -r "$COMFYUI_REPO_DIR/requirements.txt"
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "${PYPI_INDEX_URL:-https://pypi.org/simple}" \
+  pip setuptools wheel
+# Keep transitive NVIDIA dependencies on PyPI rather than PyTorch's mirror links.
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "${PYPI_INDEX_URL:-https://pypi.org/simple}" \
+  --find-links "$PYTORCH_WHEEL_ROOT/torch/" \
+  --find-links "$PYTORCH_WHEEL_ROOT/torchvision/" \
+  --find-links "$PYTORCH_WHEEL_ROOT/torchaudio/" \
+  torch torchvision torchaudio
+"$COMFYUI_VENV/bin/python" -m pip --isolated install --upgrade --no-cache-dir \
+  --index-url "${PYPI_INDEX_URL:-https://pypi.org/simple}" \
+  -r "$COMFYUI_REPO_DIR/requirements.txt"
 
 systemctl --user restart comfyui.service
 echo "Update complete."
