@@ -23,6 +23,7 @@ echo "ComfyUI    → http://localhost:8188"
 echo "Hermes     → http://localhost:9119"
 echo "Qdrant     → http://localhost:6333"
 echo "Ollama API → http://localhost:11434"
+echo "Portainer  → http://localhost:8000"
 if [[ "${enable_home_assistant,,}" == "true" ]]; then
   echo "Home Assistant → http://localhost:8123"
 fi

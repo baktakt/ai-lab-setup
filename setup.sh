@@ -537,6 +537,7 @@ echo -e "     ComfyUI       → http://localhost:8188"
 echo -e "     Hermes API    → http://localhost:8642"
 echo -e "     Hermes UI     → http://localhost:9119"
 echo -e "     Qdrant        → http://localhost:6333"
+echo -e "     Portainer     → http://localhost:8000"
 if [[ "$INSTALL_HOME_ASSISTANT" == true ]]; then
   echo -e "     Home Assistant → http://localhost:8123"
 fi
